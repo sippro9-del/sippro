@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sippro - Standalone Sample</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background: #f8fafc; }
+        .glass { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(10px); }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const Header = ({ cartCount }) => (
+            <header className="glass border-b sticky top-0 z-50 px-4 py-4 flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center">
+                        <i data-lucide="leaf" className="text-white w-5 h-5"></i>
+                    </div>
+                    <h1 className="text-xl font-bold text-gray-900 tracking-tight">Sippro</h1>
+                </div>
+                <div className="flex gap-4 items-center">
+                    <div className="relative">
+                        <i data-lucide="shopping-cart" className="text-gray-600 w-6 h-6"></i>
+                        {cartCount > 0 && (
+                            <span className="absolute -top-2 -right-2 bg-orange-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+                                {cartCount}
+                            </span>
+                        )}
+                    </div>
+                    <i data-lucide="user" className="text-gray-600 w-6 h-6"></i>
+                </div>
+            </header>
+        );
+
+        const ProductCard = ({ product, onAdd }) => (
+            <div className="bg-white rounded-2xl p-3 shadow-sm border border-gray-100 transition-transform active:scale-95">
+                <div className="aspect-square bg-gray-50 rounded-xl mb-3 flex items-center justify-center overflow-hidden">
+                    <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+                </div>
+                <h3 className="font-semibold text-gray-800 text-sm line-clamp-1">{product.name}</h3>
+                <p className="text-gray-500 text-xs mb-2">{product.category}</p>
+                <div className="flex justify-between items-center">
+                    <span className="text-green-600 font-bold">₹{product.price}</span>
+                    <button 
+                        onClick={() => onAdd(product)}
+                        className="bg-green-600 text-white p-2 rounded-lg hover:bg-green-700 transition-colors"
+                    >
+                        <i data-lucide="plus" className="w-4 h-4"></i>
+                    </button>
+                </div>
+            </div>
+        );
+
+        const App = () => {
+            const [cart, setCart] = useState([]);
+            const products = [
+                { id: 1, name: 'Organic Turmeric', price: 199, category: 'Spices', image: 'https://picsum.photos/seed/turmeric/300' },
+                { id: 2, name: 'Pure Honey', price: 450, category: 'Sweeteners', image: 'https://picsum.photos/seed/honey/300' },
+                { id: 3, name: 'Basmati Rice', price: 899, category: 'Grains', image: 'https://picsum.photos/seed/rice/300' },
+                { id: 4, name: 'Cold Pressed Oil', price: 350, category: 'Oils', image: 'https://picsum.photos/seed/oil/300' },
+            ];
+
+            useEffect(() => {
+                lucide.createIcons();
+            }, [cart]);
+
+            const addToCart = (p) => setCart([...cart, p]);
+
+            return (
+                <div className="min-h-screen pb-20">
+                    <Header cartCount={cart.length} />
+                    
+                    <main className="max-w-md mx-auto px-4 pt-6">
+                        {/* Hero Section */}
+                        <div className="bg-gradient-to-br from-green-600 to-green-800 p-6 rounded-3xl mb-8 text-white shadow-lg shadow-green-200">
+                            <h2 className="text-2xl font-bold mb-1">100% Organic</h2>
+                            <p className="text-green-100 text-sm opacity-90">Fresh from our farms to your doorstep.</p>
+                            <button className="mt-4 bg-white text-green-700 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider">
+                                Shop Now
+                            </button>
+                        </div>
+
+                        {/* Categories */}
+                        <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar mb-6">
+                            {['All', 'Spices', 'Grains', 'Oils', 'Honey'].map(cat => (
+                                <button key={cat} className="px-5 py-2 rounded-full bg-white border border-gray-100 text-sm font-medium whitespace-nowrap shadow-sm">
+                                    {cat}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Product Grid */}
+                        <h2 className="text-lg font-bold text-gray-900 mb-4">Featured Products</h2>
+                        <div className="grid grid-cols-2 gap-4">
+                            {products.map(p => (
+                                <ProductCard key={p.id} product={p} onAdd={addToCart} />
+                            ))}
+                        </div>
+                    </main>
+
+                    {/* Bottom Nav */}
+                    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t px-8 py-3 flex justify-between items-center max-w-md mx-auto">
+                        <i data-lucide="home" className="text-green-600 w-6 h-6"></i>
+                        <i data-lucide="search" className="text-gray-400 w-6 h-6"></i>
+                        <i data-lucide="heart" className="text-gray-400 w-6 h-6"></i>
+                        <i data-lucide="settings" className="text-gray-400 w-6 h-6"></i>
+                    </nav>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

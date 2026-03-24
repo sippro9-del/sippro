@@ -1,0 +1,7 @@
+{
+  "name": "SipPro Spice Marketplace",
+  "description": "A premium mobile-first marketplace for authentic spices and culinary essentials.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}

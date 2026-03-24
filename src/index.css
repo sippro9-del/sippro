@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #C2410C;
+  --color-primary-dark: #9A3412;
+  --color-secondary: #F97316;
+  --color-accent: #16A34A;
+  --color-accent-dark: #15803D;
+  --color-bg-light: #FFF7ED;
+  --color-bg-muted: #FFEDD5;
+  --color-text-primary: #111827;
+  --color-text-secondary: #6B7280;
+}
+
+@layer utilities {
+  .bg-warm-gradient {
+    background: linear-gradient(135deg, #C2410C 0%, #F97316 100%);
+  }
+  .bg-main-gradient {
+    background: linear-gradient(to bottom, #FFF7ED 0%, #FFEDD5 100%);
+  }
+  .bg-premium-gradient {
+    background: linear-gradient(135deg, #F97316 0%, #C2410C 100%);
+  }
+  .shadow-glow {
+    box-shadow: 0 4px 10px rgba(249, 115, 22, 0.3);
+  }
+  .bg-section-depth {
+    background-color: rgba(0, 0, 0, 0.03);
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  @keyframes glow {
+    0% { box-shadow: 0 0 5px rgba(239, 68, 68, 0.4); }
+    50% { box-shadow: 0 0 20px rgba(239, 68, 68, 0.8); }
+    100% { box-shadow: 0 0 5px rgba(239, 68, 68, 0.4); }
+  }
+  .animate-glow {
+    animation: glow 2s infinite ease-in-out;
+  }
+}

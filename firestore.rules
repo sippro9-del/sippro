@@ -1,0 +1,187 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: userId (UID)
+    // Fields:
+    //   - uid: string (required)
+    //   - name: string (required)
+    //   - email: string (required)
+    //   - role: string (enum: ['admin', 'user'])
+    //   - wishlist: list of strings
+    //
+    // Collection: products
+    // Document ID: auto-generated
+    // Fields:
+    //   - name: string (required)
+    //   - price: number (required)
+    //   - category: string (required)
+    //   - images: list of strings (required)
+    //   - createdAt: timestamp (required)
+    //   - rating: number
+    //   - stock: number
+    //   - isOrganic: bool
+    //   - isGlutenFree: bool
+    //   - isVegan: bool
+    //
+    // Collection: reviews
+    // Document ID: auto-generated
+    // Fields:
+    //   - userId: string
+    //   - productId: string
+    //   - userName: string
+    //   - rating: number
+    //   - comment: string
+    //   - createdAt: timestamp
+    //
+    // Collection: coupons
+    // Fields:
+    //   - code: string
+    //   - discountType: string (enum: ['percentage', 'fixed'])
+    //   - discountValue: number
+    //   - minPurchase: number
+    //   - expiryDate: timestamp
+    //   - isActive: bool
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (request.auth.token.admin == true ||
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "sippro9@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidUrl(url) {
+      return url is string && (url.matches("^https://.*") || url.matches("^http://.*"));
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'name', 'email']) &&
+             data.uid == request.auth.uid &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             isValidEmail(data.email) &&
+             (!('role' in data) || data.role in ['admin', 'user']) &&
+             (!('wishlist' in data) || data.wishlist is list);
+    }
+
+    function isValidProduct(data) {
+      return data.keys().hasAll(['name', 'price', 'category', 'images', 'createdAt']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 200 &&
+             data.price is number && data.price >= 0 &&
+             data.category is string &&
+             data.images is list &&
+             (data.createdAt is timestamp || data.createdAt is number);
+    }
+
+    function isValidReview(data) {
+      return data.keys().hasAll(['userId', 'productId', 'userName', 'rating', 'comment', 'createdAt']) &&
+             data.userId == request.auth.uid &&
+             data.productId is string &&
+             data.rating is number && data.rating >= 1 && data.rating <= 5 &&
+             data.comment is string && data.comment.size() > 0 && data.comment.size() < 1000 &&
+             (data.createdAt is timestamp || data.createdAt is number);
+    }
+
+    function isValidCoupon(data) {
+      return data.keys().hasAll(['code', 'discountType', 'discountValue', 'minPurchase', 'expiryDate', 'isActive']) &&
+             data.code is string && data.code.size() > 0 &&
+             data.discountType in ['percentage', 'fixed'] &&
+             data.discountValue is number && data.discountValue > 0 &&
+             data.minPurchase is number && data.minPurchase >= 0 &&
+             (data.expiryDate is timestamp || data.expiryDate is number) &&
+             data.isActive is bool;
+    }
+
+    function isValidCategory(data) {
+      return data.keys().hasAll(['name', 'image']) &&
+             data.name is string && data.name.size() > 0 &&
+             isValidUrl(data.image);
+    }
+
+    function isValidBanner(data) {
+      return data.keys().hasAll(['title', 'image']) &&
+             data.title is string && data.title.size() > 0 &&
+             isValidUrl(data.image);
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && isValidUser(request.resource.data) && (!('role' in request.resource.data) || request.resource.data.role == 'user' || isAdmin());
+      allow update: if isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.role == resource.data.role || isAdmin());
+    }
+
+    match /products/{productId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin() && isValidProduct(request.resource.data);
+    }
+
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && isValidReview(request.resource.data);
+      allow update, delete: if isAdmin() || isOwner(resource.data.userId);
+    }
+
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin() && isValidCategory(request.resource.data);
+    }
+
+    match /banners/{bannerId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin() && isValidBanner(request.resource.data);
+    }
+
+    match /orders/{userId}/userOrders/{orderId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId);
+      allow update: if isAdmin(); // For tracking updates
+    }
+
+    match /all_orders/{orderId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /cart/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    match /coupons/{couponId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() && isValidCoupon(request.resource.data);
+    }
+  }
+}
