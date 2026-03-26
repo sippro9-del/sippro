@@ -14,7 +14,9 @@ import { WishlistScreen } from './WishlistScreen';
 import { LoadingSpinner } from './components/Common';
 
 const AppContent: React.FC = () => {
-  const { currentScreen, loading } = useApp();
+  const appData = useApp() || {};
+const currentScreen = appData.currentScreen || "home";
+const loading = appData.loading || false;
 
   const renderScreen = () => {
     switch (currentScreen) {
