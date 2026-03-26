@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { X } from 'lucide-react';
+import { toast } from 'sonner';
 import { useApp } from '../AppContext';
 import { Header } from './Common';
 import { calculateDistance } from '../utils';
@@ -159,9 +160,10 @@ export const CheckoutScreen: React.FC = () => {
       
       await placeOrder(finalAddress, paymentMethod, appliedCoupon);
       setScreen('orders');
+      toast.success(t('order_placed_success') || 'Order placed successfully!');
     } catch (err) {
       console.error(err);
-      alert(t('order_failed'));
+      toast.error(t('order_failed'));
     } finally {
       setLoading(false);
     }

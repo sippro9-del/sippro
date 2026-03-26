@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { toast } from 'sonner';
 import { useApp } from '../AppContext';
 import { Header } from './Common';
 import { Review, ProductVariant } from '../types';
@@ -60,7 +61,7 @@ export const ProductDetailsScreen: React.FC = () => {
   const handleShare = () => {
     const shareUrl = window.location.href;
     navigator.clipboard.writeText(shareUrl).then(() => {
-      alert(t('productShared'));
+      toast.success(t('productShared'));
     });
   };
 

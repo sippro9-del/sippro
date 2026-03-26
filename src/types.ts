@@ -22,6 +22,7 @@ export interface Product {
   name: string;
   description: string;
   price: number;
+  oldPrice?: number;
   rating: number;
   image: string;
   images?: string[];

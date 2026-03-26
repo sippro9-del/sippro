@@ -44,6 +44,7 @@ interface AppContextType {
   adminOrders: { [userId: string]: Order[] };
   currentScreen: Screen;
   selectedProduct: Product | null;
+  setSelectedProductReviews: (reviews: Review[]) => void;
   selectedProductReviews: Review[];
   selectedCategory: string | null;
   loading: boolean;
@@ -52,6 +53,8 @@ interface AppContextType {
   discount: number;
   appliedCoupon: Coupon | null;
   couponError: string | null;
+  authError: string | null;
+  setAuthError: (error: string | null) => void;
   t: (key: string) => string;
   setLanguage: (lang: Language) => Promise<void>;
   setScreen: (screen: Screen) => void;
@@ -86,7 +89,7 @@ interface AppContextType {
   addProduct: (product: Omit<Product, 'id'>) => Promise<void>;
   updateProduct: (id: string, product: Partial<Product>) => Promise<void>;
   deleteProduct: (id: string) => Promise<void>;
-  addCategory: (category: { name: string; icon?: string }) => Promise<void>;
+  addCategory: (category: { name: string; image: string; icon?: string }) => Promise<void>;
   updateCategory: (id: string, category: Partial<Category>) => Promise<void>;
   deleteCategory: (id: string) => Promise<void>;
   addBanner: (banner: { title: string; subtitle?: string; image: string }) => Promise<void>;
@@ -816,7 +819,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const addCategory = async (category: { name: string; icon?: string }) => {
+  const addCategory = async (category: { name: string; image: string; icon?: string }) => {
     try {
       const categoriesRef = collection(db, 'categories');
       const sanitizedCategory = sanitizeForFirebase({ ...category, createdAt: Date.now() });

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
+import { toast } from 'sonner';
 import { useApp } from '../AppContext';
 import { Header } from './Common';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -144,8 +145,13 @@ export const AdminDashboard: React.FC = () => {
                           {t('edit')}
                         </button>
                         <button 
-                          onClick={() => {
-                            deleteProduct(product.id);
+                          onClick={async () => {
+                            try {
+                              await deleteProduct(product.id);
+                              toast.success('Product removed');
+                            } catch (e) {
+                              toast.error('Failed to remove product');
+                            }
                           }}
                           className="text-xs font-bold text-red-600 bg-red-50 px-3 py-1 rounded-lg"
                         >
@@ -246,9 +252,12 @@ export const AdminDashboard: React.FC = () => {
                       <span className="text-[10px] font-bold">Edit</span>
                     </button>
                     <button 
-                      onClick={() => {
-                        if (window.confirm('Are you sure you want to delete this category?')) {
-                          deleteCategory(cat.id);
+                      onClick={async () => {
+                        try {
+                          await deleteCategory(cat.id);
+                          toast.success('Category deleted');
+                        } catch (e) {
+                          toast.error('Failed to delete category');
                         }
                       }}
                       className="p-1 bg-red-50 text-red-600 rounded-lg"
