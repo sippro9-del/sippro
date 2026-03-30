@@ -4,6 +4,9 @@ const config: CapacitorConfig = {
   appId: 'com.sippro.app',
   appName: 'Sippro',
   webDir: 'dist',
+  server: {
+    androidScheme: 'https'
+  },
   plugins: {
     SplashScreen: {
       launchShowDuration: 3000,

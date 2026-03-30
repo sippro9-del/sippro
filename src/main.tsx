@@ -5,6 +5,24 @@ import { SplashScreen } from '@capacitor/splash-screen';
 import App from './App.tsx';
 import './index.css';
 
+// Global error handling for WebView debugging
+window.onerror = function(message, source, lineno, colno, error) {
+  console.error('Global Error:', { message, source, lineno, colno, error });
+  return false;
+};
+
+window.onunhandledrejection = function(event) {
+  console.error('Unhandled Promise Rejection:', event.reason);
+};
+
+// Log environment info
+console.log('App Environment:', {
+  isCapacitor: !!(window as any).Capacitor,
+  platform: (window as any).Capacitor?.getPlatform() || 'web',
+  userAgent: navigator.userAgent,
+  location: window.location.href
+});
+
 // Register service worker for PWA support
 registerSW({
   onNeedRefresh() {
