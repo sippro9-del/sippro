@@ -4,7 +4,8 @@ import {
   User, 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
-  signInWithPopup, 
+  signInWithRedirect, 
+  getRedirectResult,
   signOut 
 } from 'firebase/auth';
 import { 
@@ -294,6 +295,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setUser(user);
       setLoading(false);
     });
+
+    // Handle redirect result for WebView compatibility
+    getRedirectResult(auth).then((result) => {
+      if (result) {
+        console.log("Redirect login successful:", result.user.uid);
+      }
+    }).catch((error) => {
+      console.error("Redirect login error:", error);
+      setAuthError(error.message || "Login failed");
+    });
+
     return () => unsubscribeAuth();
   }, []);
 
@@ -305,14 +317,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     console.log(`[Firestore] Setting up profile listener for: ${user.uid}`);
     const profileDoc = doc(db, 'users', user.uid);
-    const unsubscribe = onSnapshot(profileDoc, (snapshot) => {
+    const unsubscribe = onSnapshot(profileDoc, async (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data() as UserProfile;
         setProfile(data);
         if (data.language) setLanguageState(data.language);
         console.log(`[Firestore] Profile updated for: ${user.uid}`);
       } else {
-        console.warn(`[Firestore] Profile document does not exist for: ${user.uid}`);
+        console.warn(`[Firestore] Profile document does not exist for: ${user.uid}, creating one...`);
+        const profileData = sanitizeForFirebase({
+          uid: user.uid,
+          name: user.displayName || 'User',
+          email: user.email,
+          role: 'user',
+          createdAt: Date.now()
+        });
+        try {
+          await setDoc(profileDoc, profileData);
+        } catch (e) {
+          console.error("Error creating initial profile:", e);
+        }
       }
     }, (error) => {
       console.error(`[Firestore] Profile listener error for ${user.uid}:`, error);
@@ -693,20 +717,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setLoading(true);
     setAuthError(null);
     try {
-      const result = await signInWithPopup(auth, googleProvider);
-      const user = result.user;
-      const profileRef = doc(db, 'users', user.uid);
-      const snapshot = await getDoc(profileRef);
-      if (!snapshot.exists()) {
-        const profileData = sanitizeForFirebase({
-          uid: user.uid,
-          name: user.displayName || 'User',
-          email: user.email,
-          role: 'user',
-          createdAt: Date.now()
-        });
-        await setDoc(profileRef, profileData);
-      }
+      await signInWithRedirect(auth, googleProvider);
     } catch (error: any) {
       console.error("Login error:", error);
       if (error.code === 'auth/unauthorized-domain') {
@@ -714,7 +725,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } else {
         setAuthError(error.message || "Login failed");
       }
-    } finally {
       setLoading(false);
     }
   };
@@ -723,20 +733,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setLoading(true);
     setAuthError(null);
     try {
-      const result = await signInWithPopup(auth, facebookProvider);
-      const user = result.user;
-      const profileRef = doc(db, 'users', user.uid);
-      const snapshot = await getDoc(profileRef);
-      if (!snapshot.exists()) {
-        const profileData = sanitizeForFirebase({
-          uid: user.uid,
-          name: user.displayName || 'User',
-          email: user.email,
-          role: 'user',
-          createdAt: Date.now()
-        });
-        await setDoc(profileRef, profileData);
-      }
+      await signInWithRedirect(auth, facebookProvider);
     } catch (error: any) {
       console.error("Login error:", error);
       if (error.code === 'auth/unauthorized-domain') {
@@ -744,7 +741,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } else {
         setAuthError(error.message || "Login failed");
       }
-    } finally {
       setLoading(false);
     }
   };

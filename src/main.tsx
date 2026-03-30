@@ -1,6 +1,5 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { registerSW } from 'virtual:pwa-register';
 import { SplashScreen } from '@capacitor/splash-screen';
 import App from './App.tsx';
 import './index.css';
@@ -21,18 +20,6 @@ console.log('App Environment:', {
   platform: (window as any).Capacitor?.getPlatform() || 'web',
   userAgent: navigator.userAgent,
   location: window.location.href
-});
-
-// Register service worker for PWA support
-registerSW({
-  onNeedRefresh() {
-    if (confirm('New content available. Reload?')) {
-      window.location.reload();
-    }
-  },
-  onOfflineReady() {
-    console.log('App ready to work offline');
-  },
 });
 
 // Hide Capacitor splash screen after app loads
