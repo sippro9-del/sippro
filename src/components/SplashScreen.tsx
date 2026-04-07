@@ -23,7 +23,7 @@ export const SplashScreen: React.FC = () => {
   }, [loading, user, setScreen]);
 
   return (
-    <div className="fixed inset-0 bg-[#000000] flex flex-col items-center justify-center z-[100] overflow-hidden">
+    <div className="fixed inset-0 bg-[#9A3412] flex flex-col items-center justify-center z-[100] overflow-hidden">
       <motion.div
         initial={{ scale: 0.5, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
