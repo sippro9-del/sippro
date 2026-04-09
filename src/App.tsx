@@ -70,6 +70,8 @@ const AppContent: React.FC = () => {
   
   // Safe destructuring with defaults
   const { currentScreen = 'splash', loading = false } = context || {};
+  
+  console.log(">>> [FLOW] AppContent render. Screen:", currentScreen, "Loading:", loading);
 
   const renderScreen = () => {
     try {
@@ -119,8 +121,8 @@ const AppContent: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-main-gradient relative overflow-x-hidden">
-      <div className="max-w-7xl mx-auto bg-transparent min-h-screen shadow-lg relative">
+    <div className="min-h-screen bg-white relative overflow-x-hidden">
+      <div className="w-full min-h-screen relative">
         {renderScreen()}
         
         {loading && currentScreen !== 'splash' && (

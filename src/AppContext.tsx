@@ -4,6 +4,7 @@ import {
   User, 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
+  signInWithPopup,
   signInWithRedirect, 
   getRedirectResult,
   signOut 
@@ -25,7 +26,7 @@ import {
   getDocFromServer,
   serverTimestamp
 } from 'firebase/firestore';
-import { auth, db, googleProvider, facebookProvider } from './firebase';
+import { auth, db, googleProvider } from './firebase';
 import { CartItem, Product, Order, UserProfile, Screen, OrderStatus, ProductVariant, Coupon, NotificationPreferences, Banner, Category, Review } from './types';
 import { Language, translations } from './translations';
 
@@ -48,6 +49,7 @@ interface AppContextType {
   setSelectedProductReviews: (reviews: Review[]) => void;
   selectedProductReviews: Review[];
   selectedCategory: string | null;
+  activeSection: 'all' | 'trending' | 'best-seller' | 'new';
   loading: boolean;
   productsLoaded: boolean;
   language: Language;
@@ -61,6 +63,7 @@ interface AppContextType {
   setScreen: (screen: Screen) => void;
   setSelectedProduct: (product: Product | null) => void;
   setSelectedCategory: (category: string | null) => void;
+  setActiveSection: (section: 'all' | 'trending' | 'best-seller' | 'new') => void;
   addToCart: (product: Product, variant?: ProductVariant) => void;
   removeFromCart: (cartItemId: string) => void;
   updateCartQuantity: (cartItemId: string, quantity: number) => void;
@@ -82,7 +85,6 @@ interface AppContextType {
   updateNotificationPreferences: (prefs: NotificationPreferences) => Promise<void>;
   // Auth functions
   loginWithGoogle: () => Promise<void>;
-  loginWithFacebook: () => Promise<void>;
   loginWithEmail: (email: string, pass: string) => Promise<void>;
   registerWithEmail: (email: string, pass: string, name: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -110,6 +112,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [currentScreen, setCurrentScreen] = useState<Screen>('splash');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [activeSection, setActiveSection] = useState<'all' | 'trending' | 'best-seller' | 'new'>('all');
   const [selectedProductReviews, setSelectedProductReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [productsLoaded, setProductsLoaded] = useState(false);
@@ -185,12 +188,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const unsubscribeProducts = onSnapshot(productsRef, (snapshot) => {
       console.log(`>>> [FLOW] 2. Firestore Products snapshot received: ${snapshot.size} items`);
-      const list = snapshot.docs.map(doc => {
+      const list = snapshot.docs.map((doc, idx) => {
         const data = doc.data();
         if (!data.name || !data.category) {
           console.warn(`>>> [FLOW] 2a. Invalid product data for ID ${doc.id}: missing name or category`, data);
         }
-        return { id: doc.id, ...data };
+        // Local fallback for flags if missing in DB
+        const trending = data.trending !== undefined ? data.trending : (idx % 2 === 0);
+        const bestSeller = data.bestSeller !== undefined ? data.bestSeller : (idx % 3 === 0);
+        return { id: doc.id, ...data, trending, bestSeller };
       }) as Product[];
       
       console.log(">>> [FLOW] 3. Setting products state with:", list.length, "items");
@@ -717,31 +723,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setLoading(true);
     setAuthError(null);
     try {
-      await signInWithRedirect(auth, googleProvider);
+      await signInWithPopup(auth, googleProvider);
     } catch (error: any) {
       console.error("Login error:", error);
-      if (error.code === 'auth/unauthorized-domain') {
-        setAuthError(`Domain not authorized. Please add "${window.location.hostname}" to your Firebase Console > Authentication > Settings > Authorized domains.`);
-      } else {
-        setAuthError(error.message || "Login failed");
-      }
+      handleAuthError(error);
       setLoading(false);
     }
   };
 
-  const loginWithFacebook = async () => {
-    setLoading(true);
-    setAuthError(null);
-    try {
-      await signInWithRedirect(auth, facebookProvider);
-    } catch (error: any) {
-      console.error("Login error:", error);
-      if (error.code === 'auth/unauthorized-domain') {
-        setAuthError(`Domain not authorized. Please add "${window.location.hostname}" to your Firebase Console > Authentication > Settings > Authorized domains.`);
-      } else {
-        setAuthError(error.message || "Login failed");
-      }
-      setLoading(false);
+  const handleAuthError = (error: any) => {
+    if (error.code === 'auth/unauthorized-domain' || error.message?.includes('403')) {
+      setAuthError(`Domain not authorized. Please add "${window.location.hostname}" to your Firebase Console > Authentication > Settings > Authorized domains.`);
+    } else if (error.code === 'auth/operation-not-allowed') {
+      setAuthError("Email/Password or Google login is not enabled in your Firebase Console.");
+    } else if (error.code === 'auth/email-already-in-use') {
+      setAuthError("This email is already registered. Please try logging in instead.");
+    } else if (error.code === 'auth/weak-password') {
+      setAuthError("Password is too weak. Please use at least 6 characters.");
+    } else if (error.code === 'auth/invalid-email') {
+      setAuthError("The email address is not valid.");
+    } else if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+      setAuthError("Invalid email or password.");
+    } else {
+      setAuthError(error.message || "Authentication failed");
     }
   };
 
@@ -751,8 +755,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       await signInWithEmailAndPassword(auth, email, pass);
     } catch (error: any) {
-      console.error("Login error:", error);
-      setAuthError(error.message || "Login failed");
+      if (error.code !== 'auth/invalid-credential' && error.code !== 'auth/user-not-found' && error.code !== 'auth/wrong-password') {
+        console.error("Login error:", error);
+      }
+      handleAuthError(error);
     } finally {
       setLoading(false);
     }
@@ -773,8 +779,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
       await setDoc(doc(db, 'users', user.uid), profileData);
     } catch (error: any) {
-      console.error("Registration error:", error);
-      setAuthError(error.message || "Registration failed");
+      if (error.code !== 'auth/email-already-in-use') {
+        console.error("Registration error:", error);
+      }
+      handleAuthError(error);
     } finally {
       setLoading(false);
     }
@@ -883,7 +891,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       validateCoupon,
       updateNotificationPreferences,
       loginWithGoogle,
-      loginWithFacebook,
       loginWithEmail,
       registerWithEmail,
       logout,
@@ -896,7 +903,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       addBanner,
       categories,
       banners,
-      productsLoaded
+      productsLoaded,
+      activeSection,
+      setActiveSection
     }}>
       {children}
     </AppContext.Provider>

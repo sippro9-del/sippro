@@ -10,13 +10,22 @@ import Banner from './Banner';
 import Categories from '../hooks/Categories';
 
 export const HomeScreen: React.FC = () => {
-  const { products: contextProducts, productsLoaded, setScreen, setSelectedProduct, addToCart, t, selectedCategory, setSelectedCategory } = useApp();
+  const { 
+    products: contextProducts, 
+    productsLoaded, 
+    setScreen, 
+    setSelectedProduct, 
+    addToCart, 
+    t, 
+    selectedCategory, 
+    setSelectedCategory,
+    activeSection,
+    setActiveSection
+  } = useApp();
   
   console.log(">>> [FLOW] 5. HomeScreen render. Context products count:", contextProducts?.length, "Loaded:", productsLoaded);
 
   const [searchQuery, setSearchQuery] = useState('');
-
-  const [activeSection, setActiveSection] = useState<'all' | 'trending' | 'best-seller'>('all');
   const [showFilters, setShowFilters] = useState(false);
   const [sortBy, setSortBy] = useState<'price-low' | 'price-high' | 'rating' | 'name'>('rating');
   const [priceRange, setPriceRange] = useState({ min: 0, max: 100000 });
@@ -38,7 +47,8 @@ export const HomeScreen: React.FC = () => {
       const matchesSection = 
         activeSection === 'all' ? true :
         activeSection === 'trending' ? p?.trending === true :
-        activeSection === 'best-seller' ? p?.bestSeller === true : true;
+        activeSection === 'best-seller' ? p?.bestSeller === true :
+        activeSection === 'new' ? (p?.createdAt ? (new Date().getTime() - new Date(p.createdAt).getTime() < 7 * 24 * 60 * 60 * 1000) : false) : true;
       
       const matchesCategory = selectedCategory 
         ? p?.category?.toLowerCase().trim() === selectedCategory?.toLowerCase().trim() 
@@ -83,8 +93,18 @@ export const HomeScreen: React.FC = () => {
     }
   }, [contextProducts, filteredProducts]);
 
+  const handleSectionClick = (section: 'all' | 'trending' | 'best-seller' | 'new') => {
+    setActiveSection(section);
+    setSelectedCategory(null);
+    // Scroll to products section
+    const element = document.getElementById('products-section');
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   return (
-    <div className="pb-24 bg-main-gradient min-h-screen relative">
+    <div className="pb-24 bg-white min-h-screen relative">
       <Header 
         showSearch 
         searchQuery={searchQuery} 
@@ -222,24 +242,24 @@ export const HomeScreen: React.FC = () => {
         </div>
 
         {/* Section Tabs */}
-        <div className="py-2 md:py-4 flex gap-3 md:gap-6 overflow-x-auto no-scrollbar max-w-7xl mx-auto px-4">
+        <div className="py-4 md:py-8 flex gap-3 md:gap-6 overflow-x-auto no-scrollbar max-w-7xl mx-auto px-4 justify-start md:justify-center">
           <button 
-            onClick={() => setActiveSection('all')}
+            onClick={() => handleSectionClick('all')}
             className={`px-8 py-3 md:px-12 md:py-4 rounded-2xl text-sm md:text-base font-black transition-all whitespace-nowrap border-2 ${activeSection === 'all' ? 'bg-primary text-white border-primary shadow-[0_12px_24px_rgba(249,115,22,0.3)]' : 'bg-white text-gray-500 border-gray-100 hover:border-primary/20 hover:bg-gray-50 shadow-sm'}`}
           >
             {t('viewAll')}
           </button>
           <button 
-            onClick={() => setActiveSection('trending')}
+            onClick={() => handleSectionClick('trending')}
             className={`px-8 py-3 md:px-12 md:py-4 rounded-2xl text-sm md:text-base font-black transition-all whitespace-nowrap border-2 ${activeSection === 'trending' ? 'bg-primary text-white border-primary shadow-[0_12px_24px_rgba(249,115,22,0.3)]' : 'bg-white text-gray-500 border-gray-100 hover:border-primary/20 hover:bg-gray-50 shadow-sm'}`}
           >
-            {t('trending')}
+            🔥 {t('trending')}
           </button>
           <button 
-            onClick={() => setActiveSection('best-seller')}
+            onClick={() => handleSectionClick('best-seller')}
             className={`px-8 py-3 md:px-12 md:py-4 rounded-2xl text-sm md:text-base font-black transition-all whitespace-nowrap border-2 ${activeSection === 'best-seller' ? 'bg-primary text-white border-primary shadow-[0_12px_24px_rgba(249,115,22,0.3)]' : 'bg-white text-gray-500 border-gray-100 hover:border-primary/20 hover:bg-gray-50 shadow-sm'}`}
           >
-            {t('bestSellers')}
+            👑 {t('bestSellers')}
           </button>
         </div>
 
@@ -285,7 +305,9 @@ export const HomeScreen: React.FC = () => {
                 )}
 
                 <h4 className="text-lg md:text-2xl font-bold text-gray-900 mb-4 capitalize">
-                  {activeSection === 'all' ? t('ourCollection') : t(activeSection === 'trending' ? 'trending' : 'bestSellers')}
+                  {activeSection === 'all' ? t('ourCollection') : 
+                   activeSection === 'trending' ? t('trending') : 
+                   t('bestSellers')}
                 </h4>
 
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 md:gap-6">

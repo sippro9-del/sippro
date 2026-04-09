@@ -36,6 +36,7 @@ export interface Product {
   isOrganic?: boolean;
   isGlutenFree?: boolean;
   isVegan?: boolean;
+  createdAt?: number | string;
 }
 
 export interface CartItem extends Product {

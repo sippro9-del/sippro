@@ -92,8 +92,8 @@ export const Header: React.FC<{
 export const BottomNav: React.FC<{ active: string; onNavigate: (screen: any) => void }> = ({ active, onNavigate }) => {
   const { t } = useApp();
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-[#3B2F2F] border-t border-white/5 z-50 pb-safe shadow-[0_-4px_12px_rgba(0,0,0,0.2)]">
-      <div className="max-w-7xl mx-auto px-6 py-3 flex justify-between items-center">
+    <nav className="fixed bottom-0 left-0 right-0 bg-[#3B2F2F] border-t border-white/5 z-50 pb-safe shadow-[0_-4px_12px_rgba(0,0,0,0.2)] md:bottom-6 md:left-1/2 md:-translate-x-1/2 md:w-auto md:min-w-[500px] md:rounded-3xl md:px-12">
+      <div className="max-w-7xl mx-auto px-6 py-3 flex justify-between items-center md:gap-16">
         <NavItem active={active === 'home'} icon="🏠" label={t('home')} onClick={() => onNavigate('home')} />
         <NavItem active={active === 'wishlist'} icon="❤️" label={t('wishlist')} onClick={() => onNavigate('wishlist')} />
         <NavItem active={active === 'orders'} icon="📦" label={t('orders')} onClick={() => onNavigate('orders')} />

@@ -22,7 +22,7 @@ function CategoryIcon({ cat }: { cat: Category }) {
 }
 
 export default function Categories() {
-  const { t, selectedCategory, setSelectedCategory, categories, loading: contextLoading } = useApp();
+  const { t, selectedCategory, setSelectedCategory, categories, loading: contextLoading, setActiveSection } = useApp();
 
   if (contextLoading && categories.length === 0) return (
     <div className="flex px-4 gap-6 md:gap-10 overflow-x-auto no-scrollbar py-8 md:justify-center">
@@ -36,6 +36,16 @@ export default function Categories() {
   );
 
   if (categories.length === 0) return null;
+
+  const handleCategoryClick = (catName: string | null) => {
+    setSelectedCategory(catName);
+    setActiveSection('all');
+    // Scroll to products section
+    const element = document.getElementById('products-section');
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
 
   return (
     <section className="py-8 md:py-16 bg-gradient-to-b from-white to-gray-50/30">
@@ -52,7 +62,7 @@ export default function Categories() {
         <motion.div 
           whileHover={{ y: -5 }}
           whileTap={{ scale: 0.95 }}
-          onClick={() => setSelectedCategory(null)}
+          onClick={() => handleCategoryClick(null)}
           className="flex flex-col items-center gap-4 min-w-[90px] md:min-w-[130px] group cursor-pointer"
         >
           <div className={`w-20 h-20 md:w-28 md:h-28 rounded-[2.5rem] flex items-center justify-center transition-all duration-500 transform group-hover:rotate-3 relative overflow-hidden ${!selectedCategory ? 'bg-warm-gradient text-white shadow-xl shadow-primary/20 scale-105' : 'bg-white text-primary border border-gray-100 shadow-lg hover:border-primary/30'}`}>
@@ -75,7 +85,7 @@ export default function Categories() {
               key={cat.id}
               whileHover={{ y: -5 }}
               whileTap={{ scale: 0.95 }}
-              onClick={() => setSelectedCategory(cat.name)}
+              onClick={() => handleCategoryClick(cat.name)}
               className="flex flex-col items-center gap-4 min-w-[90px] md:min-w-[130px] group cursor-pointer"
             >
               <div className={`w-20 h-20 md:w-28 md:h-28 rounded-[2.5rem] flex items-center justify-center overflow-hidden transition-all duration-500 transform group-hover:-rotate-3 relative ${isActive ? 'bg-warm-gradient text-white shadow-xl shadow-primary/20 scale-105' : 'bg-white text-secondary border border-gray-100 shadow-lg hover:border-primary/30'}`}>
