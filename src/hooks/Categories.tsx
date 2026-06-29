@@ -79,13 +79,14 @@ export default function Categories() {
         </motion.div>
 
         {categories.map(cat => {
-          const isActive = selectedCategory?.toLowerCase().trim() === cat.name.toLowerCase().trim();
+          const catName = cat.name || '';
+          const isActive = selectedCategory?.toLowerCase().trim() === catName.toLowerCase().trim();
           return (
             <motion.div 
               key={cat.id}
               whileHover={{ y: -5 }}
               whileTap={{ scale: 0.95 }}
-              onClick={() => handleCategoryClick(cat.name)}
+              onClick={() => handleCategoryClick(catName)}
               className="flex flex-col items-center gap-4 min-w-[90px] md:min-w-[130px] group cursor-pointer"
             >
               <div className={`w-20 h-20 md:w-28 md:h-28 rounded-[2.5rem] flex items-center justify-center overflow-hidden transition-all duration-500 transform group-hover:-rotate-3 relative ${isActive ? 'bg-warm-gradient text-white shadow-xl shadow-primary/20 scale-105' : 'bg-white text-secondary border border-gray-100 shadow-lg hover:border-primary/30'}`}>
@@ -100,7 +101,7 @@ export default function Categories() {
                   <CategoryIcon cat={cat} />
                 </div>
               </div>
-              <span className={`text-sm md:text-lg font-black tracking-tight transition-all duration-300 text-center ${isActive ? 'text-primary scale-110' : 'text-gray-500 group-hover:text-primary'}`}>{cat.name}</span>
+              <span className={`text-sm md:text-lg font-black tracking-tight transition-all duration-300 text-center ${isActive ? 'text-primary scale-110' : 'text-gray-500 group-hover:text-primary'}`}>{catName}</span>
             </motion.div>
           );
         })}

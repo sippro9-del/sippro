@@ -111,9 +111,9 @@ export const HomeScreen: React.FC = () => {
         onSearchChange={setSearchQuery} 
       />
       
-      <div className="w-full px-2 md:px-4">
+      <div className="w-full max-w-7xl mx-auto px-2 md:px-4">
         {/* Sorting & Advanced Filter Toggle */}
-        <div className="px-4 py-4 md:py-6 bg-white/80 backdrop-blur-md flex gap-3 sticky top-[80px] md:top-[100px] z-40 border-b border-gray-100 shadow-sm">
+        <div className="px-4 py-4 md:py-6 bg-white/80 backdrop-blur-md flex gap-3 sticky top-[124px] md:top-[74px] z-40 border-b border-gray-100 shadow-sm">
           <div className="relative flex-1 max-w-xs group">
             <div className="absolute left-4 top-1/2 -translate-y-1/2 text-primary/60 group-focus-within:text-primary transition-colors">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -385,7 +385,7 @@ export const ProductCard: React.FC<{ product: Product; onSelect: () => void; onA
     <motion.div 
       whileHover={{ y: -4 }}
       whileTap={{ scale: 0.98 }}
-      className={`bg-white rounded-3xl p-3 md:p-4 shadow-[0_6px_16px_rgba(0,0,0,0.12)] border border-gray-100 flex flex-col relative transition-all ${fullWidth ? 'w-full' : 'w-44 md:w-64'}`}
+      className={`bg-white rounded-3xl p-3 md:p-4 shadow-[0_6px_16px_rgba(0,0,0,0.12)] border border-gray-100 flex flex-col relative transition-all ${fullWidth ? 'w-full' : 'w-44 md:w-64 flex-shrink-0'}`}
     >
       <button 
         onClick={(e) => {

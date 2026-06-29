@@ -51,3 +51,35 @@ For Google Sign-In to work in the production app:
 1. Get the **SHA-1** from your App Signing key in the Google Play Console.
 2. Add this SHA-1 to your **Firebase Project Settings**.
 3. Download the new `google-services.json` and put it in `android/app/`.
+
+## 5. Play Store Listing (Copy & Paste)
+### App Description
+Discover the power of AI with our smart Spice Assistant app!
+
+🌟 Features:
+- AI-powered chatbot for spice knowledge and recipes
+- Smart product browsing
+- Fast and user-friendly interface
+- Real-time responses using advanced AI
+
+🤖 AI Assistant:
+Ask anything about spices, cooking tips, or recipes and get instant answers.
+
+⚡ Performance:
+Optimized for smooth performance and fast loading.
+
+🔒 Privacy Focused:
+Your data is सुरक्षित and never sold.
+
+Note:
+AI-generated responses may not always be accurate.
+
+Download now and explore a smarter way to cook!
+
+### Privacy Policy Data
+This app collects and processes limited user data to improve functionality and user experience.
+
+- **Data Collection**: User inputs (chat messages), Basic device information (for analytics).
+- **Usage**: To provide AI-generated responses, To improve app performance.
+- **Third-party Services**: Google Firebase (authentication, notifications), Google Gemini AI (for chatbot responses).
+- **Security**: Data is never sold or shared with third parties.

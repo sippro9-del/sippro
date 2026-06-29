@@ -195,7 +195,7 @@ export const CartScreen: React.FC = () => {
       </div>
 
       {cart.length > 0 && (
-        <div className="lg:hidden fixed bottom-20 left-0 right-0 bg-white/95 backdrop-blur-xl border-t border-gray-100 p-6 z-40 shadow-[0_-4px_12px_rgba(0,0,0,0.2)]">
+        <div className="lg:hidden fixed bottom-20 md:bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl border-t border-gray-100 p-6 z-40 shadow-[0_-4px_12px_rgba(0,0,0,0.2)]">
           <div className="max-w-7xl mx-auto">
             <div className="space-y-2 mb-4">
               <div className="flex justify-between items-center">

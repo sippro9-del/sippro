@@ -28,7 +28,7 @@ export const AdminDashboard: React.FC = () => {
     <div className="pb-24 bg-main-gradient min-h-screen">
       <Header title={t('adminDashboard')} showBack onBack={() => setScreen('profile')} />
       
-      <div className="px-4 py-6">
+      <div className="max-w-7xl mx-auto px-4 py-6 md:py-12">
         {/* Stats */}
         <div className="grid grid-cols-2 gap-4 mb-8">
           <div className="bg-white p-6 rounded-3xl border border-gray-50 shadow-[0_6px_16px_rgba(0,0,0,0.12)]">

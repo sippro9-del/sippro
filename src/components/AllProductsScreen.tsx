@@ -37,9 +37,11 @@ export const AllProductsScreen: React.FC = () => {
 
   const filteredProducts = products
     .filter(p => {
-      const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                           p.category.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesCategory = activeCategory === 'all' || p.category?.toLowerCase().trim() === activeCategory?.toLowerCase().trim();
+      const name = p.name || '';
+      const category = p.category || '';
+      const matchesSearch = name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                           category.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesCategory = activeCategory === 'all' || category.toLowerCase().trim() === activeCategory?.toLowerCase().trim();
       const matchesPrice = p.price >= priceRange[0] && p.price <= priceRange[1];
       const matchesRating = (p.rating || 0) >= minRating;
       const matchesStock = !inStockOnly || (p.stock || 0) > 0;
@@ -53,7 +55,7 @@ export const AllProductsScreen: React.FC = () => {
       if (sortBy === 'price-low') return a.price - b.price;
       if (sortBy === 'price-high') return b.price - a.price;
       if (sortBy === 'rating') return (b.rating || 0) - (a.rating || 0);
-      if (sortBy === 'name') return a.name.localeCompare(b.name);
+      if (sortBy === 'name') return (a.name || '').localeCompare(b.name || '');
       return 0;
     });
 
@@ -68,8 +70,8 @@ export const AllProductsScreen: React.FC = () => {
         onSearchChange={setSearchQuery} 
       />
       
-      <div className="w-full px-2 md:px-4">
-        <div className="px-2 py-4 md:py-6 bg-white sticky top-[110px] md:top-[120px] z-40 border-b border-gray-100 shadow-[0_6px_16px_rgba(0,0,0,0.12)]">
+      <div className="w-full max-w-7xl mx-auto px-2 md:px-4">
+        <div className="px-2 py-4 md:py-6 bg-white sticky top-[124px] md:top-[74px] z-40 border-b border-gray-100 shadow-[0_6px_16px_rgba(0,0,0,0.12)]">
           <div className="flex flex-col md:flex-row gap-4 mb-4 md:items-center">
             <div className="relative flex-1">
               <select 

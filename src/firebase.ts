@@ -9,9 +9,12 @@ console.log("Firebase Project ID:", firebaseConfig.projectId);
 export const auth = getAuth(app);
 
 // Use initializeFirestore with experimentalForceLongPolling: true to fix WebChannelConnection transport errors
-export const db = initializeFirestore(app, {
+const dbSettings = {
   experimentalForceLongPolling: true,
-}, (firebaseConfig as any).firestoreDatabaseId);
+};
+export const db = (firebaseConfig as any).firestoreDatabaseId
+  ? initializeFirestore(app, dbSettings, (firebaseConfig as any).firestoreDatabaseId)
+  : initializeFirestore(app, dbSettings);
 
 console.log(">>> [FLOW] 0. Firestore initialized with long polling:", !!db);
 if (db) {

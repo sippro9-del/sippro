@@ -234,6 +234,11 @@ export const ProfileScreen: React.FC = () => {
             label={t('notifications')} 
             onClick={() => setIsEditingNotifications(true)} 
           />
+          <ProfileMenuItem 
+            icon="🔒" 
+            label="Privacy Policy" 
+            onClick={() => setScreen('privacy-policy')} 
+          />
           
           <button 
             onClick={handleLogout}

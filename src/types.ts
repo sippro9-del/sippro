@@ -110,4 +110,9 @@ export interface UserProfile {
   notificationPreferences?: NotificationPreferences;
 }
 
-export type Screen = 'splash' | 'auth' | 'login' | 'signup' | 'home' | 'product-details' | 'cart' | 'checkout' | 'orders' | 'profile' | 'admin-dashboard' | 'admin-products' | 'admin-orders' | 'all-products' | 'wishlist';
+export type Screen = 'splash' | 'auth' | 'login' | 'signup' | 'home' | 'product-details' | 'cart' | 'checkout' | 'orders' | 'profile' | 'admin-dashboard' | 'admin-products' | 'admin-orders' | 'all-products' | 'wishlist' | 'chat' | 'privacy-policy';
+
+export interface AIMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+}

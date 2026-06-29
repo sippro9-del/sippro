@@ -7,7 +7,9 @@ import {
   signInWithPopup,
   signInWithRedirect, 
   getRedirectResult,
-  signOut 
+  signOut,
+  signInWithCredential,
+  GoogleAuthProvider
 } from 'firebase/auth';
 import { 
   doc, 
@@ -27,8 +29,9 @@ import {
   serverTimestamp
 } from 'firebase/firestore';
 import { auth, db, googleProvider } from './firebase';
-import { CartItem, Product, Order, UserProfile, Screen, OrderStatus, ProductVariant, Coupon, NotificationPreferences, Banner, Category, Review } from './types';
+import { AIMessage, CartItem, Product, Order, UserProfile, Screen, OrderStatus, ProductVariant, Coupon, NotificationPreferences, Banner, Category, Review } from './types';
 import { Language, translations } from './translations';
+import { getGeminiResponse } from './services/GeminiService';
 
 const MOCK_COUPONS: Coupon[] = [
   { code: 'WELCOME10', discountType: 'percentage', discountValue: 10, minPurchase: 50, expiryDate: Date.now() + 30 * 24 * 60 * 60 * 1000, isActive: true },
@@ -96,6 +99,11 @@ interface AppContextType {
   updateCategory: (id: string, category: Partial<Category>) => Promise<void>;
   deleteCategory: (id: string) => Promise<void>;
   addBanner: (banner: { title: string; subtitle?: string; image: string }) => Promise<void>;
+  // AI functions
+  sendMessageToAI: (message: string) => Promise<void>;
+  chatHistory: AIMessage[];
+  clearChat: () => void;
+  isAiLoading: boolean;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -121,6 +129,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [discount, setDiscount] = useState(0);
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
   const [couponError, setCouponError] = useState<string | null>(null);
+  const [chatHistory, setChatHistory] = useState<AIMessage[]>([]);
+  const [isAiLoading, setIsAiLoading] = useState(false);
 
   const t = (key: string) => {
     return translations[language][key] || key;
@@ -302,15 +312,60 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setLoading(false);
     });
 
-    // Handle redirect result for WebView compatibility
-    getRedirectResult(auth).then((result) => {
-      if (result) {
-        console.log("Redirect login successful:", result.user.uid);
-      }
-    }).catch((error) => {
-      console.error("Redirect login error:", error);
-      setAuthError(error.message || "Login failed");
-    });
+    // Handle redirect result for WebView compatibility with a safe try-catch wrapper
+    try {
+      getRedirectResult(auth).then((result) => {
+        const params = new URLSearchParams(window.location.search);
+        const isExternalSignIn = params.get('google_signin_external') === 'true';
+        const syncId = params.get('syncId');
+
+        if (result) {
+          console.log("Redirect login successful:", result.user.uid);
+          if (isExternalSignIn && syncId) {
+            const credential = GoogleAuthProvider.credentialFromResult(result);
+            if (credential) {
+              console.log(">>> WebView Google Sign-In: Syncing credential for syncId:", syncId);
+              setDoc(doc(db, 'webview_sync', syncId), {
+                status: 'success',
+                credential: {
+                  idToken: credential.idToken || null,
+                  accessToken: credential.accessToken || null
+                },
+                updatedAt: new Date().toISOString()
+              }).catch(e => console.error("Error setting sync doc:", e));
+            }
+          }
+        } else {
+          // If no redirect result but we are in external sign-in flow, trigger redirect!
+          if (isExternalSignIn && syncId) {
+            console.log(">>> WebView Google Sign-In: No redirect result, triggering redirect now...");
+            signInWithRedirect(auth, googleProvider).catch(err => {
+              console.error("signInWithRedirect error:", err);
+              setDoc(doc(db, 'webview_sync', syncId), {
+                status: 'error',
+                error: err.message || "Google Sign-In failed.",
+                updatedAt: new Date().toISOString()
+              }).catch(e => console.error(e));
+            });
+          }
+        }
+      }).catch((error) => {
+        console.error("Redirect login error:", error);
+        const params = new URLSearchParams(window.location.search);
+        const isExternalSignIn = params.get('google_signin_external') === 'true';
+        const syncId = params.get('syncId');
+        if (isExternalSignIn && syncId) {
+          setDoc(doc(db, 'webview_sync', syncId), {
+            status: 'error',
+            error: error.message || "Google Sign-In failed.",
+            updatedAt: new Date().toISOString()
+          }).catch(e => console.error(e));
+        }
+        setAuthError(error.message || "Login failed");
+      });
+    } catch (error) {
+      console.warn("Failed to check redirect result (likely due to third-party storage or iframe sandbox restrictions):", error);
+    }
 
     return () => unsubscribeAuth();
   }, []);
@@ -719,9 +774,83 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const isWebView = () => {
+    const ua = window.navigator.userAgent.toLowerCase();
+    const isAndroid = ua.includes('android');
+    const isWv = ua.includes('wv') || (isAndroid && ua.includes('version/'));
+    const isAppInterface = (window as any).AppInventor || (window as any).Kodular || (window as any).android;
+    return isAndroid && (isWv || isAppInterface);
+  };
+
   const loginWithGoogle = async () => {
     setLoading(true);
     setAuthError(null);
+
+    if (isWebView()) {
+      console.log(">>> WebView detected! Opening Google Sign-In in external browser.");
+      try {
+        const syncId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+        
+        // 1. Create a temporary document in Firestore webview_sync
+        await setDoc(doc(db, 'webview_sync', syncId), {
+          status: 'pending',
+          createdAt: new Date().toISOString()
+        });
+
+        // 2. Build target external URL and intent URL to escape WebView and launch Chrome/default browser
+        const targetUrl = `${window.location.origin}/?google_signin_external=true&syncId=${syncId}`;
+        const intentUrl = `intent://${window.location.host}/?google_signin_external=true&syncId=${syncId}#Intent;scheme=https;end`;
+
+        console.log(">>> WebView Google Sign-In: Redirecting to intent:", intentUrl);
+        window.location.href = intentUrl;
+
+        // 3. Listen for the synchronization document updates
+        const unsubscribe = onSnapshot(doc(db, 'webview_sync', syncId), async (snapshot) => {
+          if (snapshot.exists()) {
+            const data = snapshot.data();
+            if (data.status === 'success' && data.credential) {
+              unsubscribe();
+              console.log(">>> WebView Google Sign-In: Credential received from external browser. Logging in...");
+              
+              // Delete the document immediately for safety
+              try {
+                await deleteDoc(doc(db, 'webview_sync', syncId));
+              } catch (e) {}
+
+              const { idToken, accessToken } = data.credential;
+              const credential = GoogleAuthProvider.credential(idToken, accessToken);
+              try {
+                await signInWithCredential(auth, credential);
+              } catch (err: any) {
+                console.error("Sign in with credential error:", err);
+                handleAuthError(err);
+                setLoading(false);
+              }
+            } else if (data.status === 'error') {
+              unsubscribe();
+              try {
+                await deleteDoc(doc(db, 'webview_sync', syncId));
+              } catch (e) {}
+              setAuthError(data.error || "Google Sign-In failed in browser.");
+              setLoading(false);
+            }
+          }
+        });
+
+        // Timeout of 3 minutes for the handshake
+        setTimeout(() => {
+          unsubscribe();
+          setLoading(false);
+        }, 180000);
+
+      } catch (error: any) {
+        console.error("WebView Google Sign-In initialization failed:", error);
+        setAuthError(error.message || "Failed to initiate Google Sign-In.");
+        setLoading(false);
+      }
+      return;
+    }
+
     try {
       await signInWithPopup(auth, googleProvider);
     } catch (error: any) {
@@ -862,6 +991,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const sendMessageToAI = async (message: string) => {
+    if (!message.trim()) return;
+
+    const userMessage: AIMessage = { role: 'user', content: message };
+    setChatHistory(prev => [...prev, userMessage]);
+    setIsAiLoading(true);
+
+    try {
+      const systemContext = `You are the Sippro Spice Expert assistant. 
+      Sippro is a premium marketplace for authentic spices.
+      Available products: ${products.map(p => p.name).join(', ')}.
+      Categories: ${categories.map(c => c.name).join(', ')}.
+      Be helpful, polite, and suggest spices or recipes based on the user's needs.
+      Keep answers concise and relevant to culinary topics.`;
+
+      const aiResponse = await getGeminiResponse(message, systemContext);
+      const assistantMessage: AIMessage = { role: 'assistant', content: aiResponse };
+      setChatHistory(prev => [...prev, assistantMessage]);
+    } catch (error) {
+      console.error("AI Chat Error:", error);
+      const errorMessage: AIMessage = { role: 'assistant', content: "I'm sorry, I'm having trouble connecting right now. Please try again later." };
+      setChatHistory(prev => [...prev, errorMessage]);
+    } finally {
+      setIsAiLoading(false);
+    }
+  };
+
+  const clearChat = () => {
+    setChatHistory([]);
+  };
+
   return (
     <AppContext.Provider value={{
       user, profile, products, cart, orders, adminOrders, currentScreen, selectedProduct, selectedCategory, loading, language,
@@ -905,7 +1065,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       banners,
       productsLoaded,
       activeSection,
-      setActiveSection
+      setActiveSection,
+      sendMessageToAI,
+      chatHistory,
+      clearChat,
+      isAiLoading
     }}>
       {children}
     </AppContext.Provider>

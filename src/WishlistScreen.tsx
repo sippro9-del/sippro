@@ -13,7 +13,7 @@ export const WishlistScreen: React.FC = () => {
     <div className="pb-32 bg-main-gradient min-h-screen">
       <Header title={t('myWishlist')} />
       
-      <div className="w-full px-2 md:px-4 py-8 md:py-12">
+      <div className="w-full max-w-7xl mx-auto px-2 md:px-4 py-8 md:py-12">
         {wishlistProducts.length === 0 ? (
           <div className="text-center py-32 md:py-48 bg-white rounded-2xl shadow-[0_6px_16px_rgba(0,0,0,0.12)] border border-gray-100">
             <span className="text-7xl md:text-9xl block mb-6 md:mb-10">💝</span>
