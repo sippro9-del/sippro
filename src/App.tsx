@@ -75,65 +75,6 @@ const AppContent: React.FC = () => {
   
   console.log(">>> [FLOW] AppContent render. Screen:", currentScreen, "Loading:", loading);
 
-  const params = new URLSearchParams(window.location.search);
-  const isExternalSignIn = params.get('google_signin_external') === 'true';
-  const syncId = params.get('syncId');
-  const user = context?.user;
-
-  const renderExternalOverlay = () => {
-    if (!isExternalSignIn || !syncId) return null;
-
-    return (
-      <div className="fixed inset-0 bg-gray-900/95 z-[9999] flex items-center justify-center p-4 backdrop-blur-md animate-fade-in">
-        <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-gray-100 text-center space-y-6">
-          {user ? (
-            <>
-              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto">
-                <span className="text-4xl">🎉</span>
-              </div>
-              <h2 className="text-2xl font-black text-gray-900 tracking-tight">
-                Google Login Successful!
-              </h2>
-              <p className="text-gray-600 font-medium">
-                You have successfully authenticated. You can now close this browser tab and safely return to your Android app!
-              </p>
-              <div className="p-4 bg-green-50 rounded-2xl border border-green-100 text-sm font-semibold text-green-700 break-all">
-                Logged in as: {user.email}
-              </div>
-              <button 
-                onClick={() => {
-                  try {
-                    window.close();
-                  } catch (e) {
-                    console.warn("Could not close window automatically:", e);
-                  }
-                }}
-                className="w-full py-4 bg-[#3B2F2F] text-white rounded-2xl font-black hover:bg-[#3B2F2F]/90 transition-all shadow-md active:scale-95"
-              >
-                Done
-              </button>
-            </>
-          ) : (
-            <>
-              <div className="w-20 h-20 bg-amber-100 rounded-full flex items-center justify-center mx-auto animate-pulse">
-                <span className="text-4xl">🔐</span>
-              </div>
-              <h2 className="text-2xl font-black text-gray-900 tracking-tight">
-                Authenticating...
-              </h2>
-              <p className="text-gray-600 font-medium">
-                Completing Google authentication in Chrome. Please do not close this window.
-              </p>
-              <div className="flex justify-center py-2">
-                <div className="w-12 h-12 border-4 border-[#3B2F2F] border-t-transparent rounded-full animate-spin"></div>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-    );
-  };
-
   const renderScreen = () => {
     try {
       switch (currentScreen) {
@@ -188,7 +129,6 @@ const AppContent: React.FC = () => {
   return (
     <div className="min-h-screen bg-white relative overflow-x-hidden">
       <div className="w-full min-h-screen relative">
-        {renderExternalOverlay()}
         {renderScreen()}
         
         {loading && currentScreen !== 'splash' && (

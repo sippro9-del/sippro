@@ -4,12 +4,9 @@ import {
   User, 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
-  signInWithPopup,
-  signInWithRedirect, 
-  getRedirectResult,
   signOut,
-  signInWithCredential,
-  GoogleAuthProvider
+  signInWithPhoneNumber,
+  RecaptchaVerifier
 } from 'firebase/auth';
 import { 
   doc, 
@@ -28,7 +25,7 @@ import {
   getDocFromServer,
   serverTimestamp
 } from 'firebase/firestore';
-import { auth, db, googleProvider } from './firebase';
+import { auth, db } from './firebase';
 import { AIMessage, CartItem, Product, Order, UserProfile, Screen, OrderStatus, ProductVariant, Coupon, NotificationPreferences, Banner, Category, Review } from './types';
 import { Language, translations } from './translations';
 import { getGeminiResponse } from './services/GeminiService';
@@ -87,7 +84,8 @@ interface AppContextType {
   // Notification functions
   updateNotificationPreferences: (prefs: NotificationPreferences) => Promise<void>;
   // Auth functions
-  loginWithGoogle: () => Promise<void>;
+  sendOTP: (phoneNumber: string, recaptchaVerifier: any) => Promise<any>;
+  verifyOTP: (otpCode: string) => Promise<void>;
   loginWithEmail: (email: string, pass: string) => Promise<void>;
   registerWithEmail: (email: string, pass: string, name: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -131,6 +129,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [couponError, setCouponError] = useState<string | null>(null);
   const [chatHistory, setChatHistory] = useState<AIMessage[]>([]);
   const [isAiLoading, setIsAiLoading] = useState(false);
+  const [confirmationResult, setConfirmationResult] = useState<any>(null);
 
   const t = (key: string) => {
     return translations[language][key] || key;
@@ -312,61 +311,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setLoading(false);
     });
 
-    // Handle redirect result for WebView compatibility with a safe try-catch wrapper
-    try {
-      getRedirectResult(auth).then((result) => {
-        const params = new URLSearchParams(window.location.search);
-        const isExternalSignIn = params.get('google_signin_external') === 'true';
-        const syncId = params.get('syncId');
-
-        if (result) {
-          console.log("Redirect login successful:", result.user.uid);
-          if (isExternalSignIn && syncId) {
-            const credential = GoogleAuthProvider.credentialFromResult(result);
-            if (credential) {
-              console.log(">>> WebView Google Sign-In: Syncing credential for syncId:", syncId);
-              setDoc(doc(db, 'webview_sync', syncId), {
-                status: 'success',
-                credential: {
-                  idToken: credential.idToken || null,
-                  accessToken: credential.accessToken || null
-                },
-                updatedAt: new Date().toISOString()
-              }).catch(e => console.error("Error setting sync doc:", e));
-            }
-          }
-        } else {
-          // If no redirect result but we are in external sign-in flow, trigger redirect!
-          if (isExternalSignIn && syncId) {
-            console.log(">>> WebView Google Sign-In: No redirect result, triggering redirect now...");
-            signInWithRedirect(auth, googleProvider).catch(err => {
-              console.error("signInWithRedirect error:", err);
-              setDoc(doc(db, 'webview_sync', syncId), {
-                status: 'error',
-                error: err.message || "Google Sign-In failed.",
-                updatedAt: new Date().toISOString()
-              }).catch(e => console.error(e));
-            });
-          }
-        }
-      }).catch((error) => {
-        console.error("Redirect login error:", error);
-        const params = new URLSearchParams(window.location.search);
-        const isExternalSignIn = params.get('google_signin_external') === 'true';
-        const syncId = params.get('syncId');
-        if (isExternalSignIn && syncId) {
-          setDoc(doc(db, 'webview_sync', syncId), {
-            status: 'error',
-            error: error.message || "Google Sign-In failed.",
-            updatedAt: new Date().toISOString()
-          }).catch(e => console.error(e));
-        }
-        setAuthError(error.message || "Login failed");
-      });
-    } catch (error) {
-      console.warn("Failed to check redirect result (likely due to third-party storage or iframe sandbox restrictions):", error);
-    }
-
     return () => unsubscribeAuth();
   }, []);
 
@@ -388,8 +332,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         console.warn(`[Firestore] Profile document does not exist for: ${user.uid}, creating one...`);
         const profileData = sanitizeForFirebase({
           uid: user.uid,
-          name: user.displayName || 'User',
-          email: user.email,
+          name: user.displayName || user.phoneNumber || 'User',
+          email: user.email || '',
+          phone: user.phoneNumber || '',
           role: 'user',
           createdAt: Date.now()
         });
@@ -774,97 +719,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const isWebView = () => {
-    const ua = window.navigator.userAgent.toLowerCase();
-    const isAndroid = ua.includes('android');
-    const isWv = ua.includes('wv') || (isAndroid && ua.includes('version/'));
-    const isAppInterface = (window as any).AppInventor || (window as any).Kodular || (window as any).android;
-    return isAndroid && (isWv || isAppInterface);
-  };
-
-  const loginWithGoogle = async () => {
-    setLoading(true);
-    setAuthError(null);
-
-    if (isWebView()) {
-      console.log(">>> WebView detected! Opening Google Sign-In in external browser.");
-      try {
-        const syncId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-        
-        // 1. Create a temporary document in Firestore webview_sync
-        await setDoc(doc(db, 'webview_sync', syncId), {
-          status: 'pending',
-          createdAt: new Date().toISOString()
-        });
-
-        // 2. Build target external URL and intent URL to escape WebView and launch Chrome/default browser
-        const targetUrl = `${window.location.origin}/?google_signin_external=true&syncId=${syncId}`;
-        const intentUrl = `intent://${window.location.host}/?google_signin_external=true&syncId=${syncId}#Intent;scheme=https;end`;
-
-        console.log(">>> WebView Google Sign-In: Redirecting to intent:", intentUrl);
-        window.location.href = intentUrl;
-
-        // 3. Listen for the synchronization document updates
-        const unsubscribe = onSnapshot(doc(db, 'webview_sync', syncId), async (snapshot) => {
-          if (snapshot.exists()) {
-            const data = snapshot.data();
-            if (data.status === 'success' && data.credential) {
-              unsubscribe();
-              console.log(">>> WebView Google Sign-In: Credential received from external browser. Logging in...");
-              
-              // Delete the document immediately for safety
-              try {
-                await deleteDoc(doc(db, 'webview_sync', syncId));
-              } catch (e) {}
-
-              const { idToken, accessToken } = data.credential;
-              const credential = GoogleAuthProvider.credential(idToken, accessToken);
-              try {
-                await signInWithCredential(auth, credential);
-              } catch (err: any) {
-                console.error("Sign in with credential error:", err);
-                handleAuthError(err);
-                setLoading(false);
-              }
-            } else if (data.status === 'error') {
-              unsubscribe();
-              try {
-                await deleteDoc(doc(db, 'webview_sync', syncId));
-              } catch (e) {}
-              setAuthError(data.error || "Google Sign-In failed in browser.");
-              setLoading(false);
-            }
-          }
-        });
-
-        // Timeout of 3 minutes for the handshake
-        setTimeout(() => {
-          unsubscribe();
-          setLoading(false);
-        }, 180000);
-
-      } catch (error: any) {
-        console.error("WebView Google Sign-In initialization failed:", error);
-        setAuthError(error.message || "Failed to initiate Google Sign-In.");
-        setLoading(false);
-      }
-      return;
-    }
-
-    try {
-      await signInWithPopup(auth, googleProvider);
-    } catch (error: any) {
-      console.error("Login error:", error);
-      handleAuthError(error);
-      setLoading(false);
-    }
-  };
-
   const handleAuthError = (error: any) => {
     if (error.code === 'auth/unauthorized-domain' || error.message?.includes('403')) {
       setAuthError(`Domain not authorized. Please add "${window.location.hostname}" to your Firebase Console > Authentication > Settings > Authorized domains.`);
     } else if (error.code === 'auth/operation-not-allowed') {
-      setAuthError("Email/Password or Google login is not enabled in your Firebase Console.");
+      setAuthError("Email/Password or Phone Authentication is not enabled in your Firebase Console.");
     } else if (error.code === 'auth/email-already-in-use') {
       setAuthError("This email is already registered. Please try logging in instead.");
     } else if (error.code === 'auth/weak-password') {
@@ -873,8 +732,58 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setAuthError("The email address is not valid.");
     } else if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
       setAuthError("Invalid email or password.");
+    } else if (error.code === 'auth/invalid-phone-number') {
+      setAuthError("The phone number is invalid. Please make sure to include the country code (e.g. +91).");
+    } else if (error.code === 'auth/missing-phone-number') {
+      setAuthError("Please enter a valid phone number.");
+    } else if (error.code === 'auth/quota-exceeded') {
+      setAuthError("SMS quota exceeded for this project. Please try again later.");
+    } else if (error.code === 'auth/invalid-verification-code') {
+      setAuthError("Invalid OTP code. Please enter the correct code.");
+    } else if (error.code === 'auth/code-expired') {
+      setAuthError("The OTP code has expired. Please request a new one.");
+    } else if (error.code === 'auth/too-many-requests') {
+      setAuthError("Too many requests. Please try again later.");
+    } else if (error.code === 'auth/captcha-check-failed') {
+      setAuthError("reCAPTCHA verification failed. Please try again.");
     } else {
       setAuthError(error.message || "Authentication failed");
+    }
+  };
+
+  const sendOTP = async (phoneNumber: string, recaptchaVerifier: any) => {
+    setLoading(true);
+    setAuthError(null);
+    try {
+      console.log(">>> [Phone Auth] Sending OTP to:", phoneNumber);
+      const result = await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifier);
+      setConfirmationResult(result);
+      return result;
+    } catch (error: any) {
+      console.error("sendOTP error:", error);
+      handleAuthError(error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const verifyOTP = async (otpCode: string) => {
+    setLoading(true);
+    setAuthError(null);
+    try {
+      if (!confirmationResult) {
+        throw new Error("No pending OTP confirmation. Please request OTP first.");
+      }
+      console.log(">>> [Phone Auth] Verifying OTP code:", otpCode);
+      await confirmationResult.confirm(otpCode);
+      setCurrentScreen('home');
+    } catch (error: any) {
+      console.error("verifyOTP error:", error);
+      handleAuthError(error);
+      throw error;
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -1050,7 +959,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       applyCoupon,
       validateCoupon,
       updateNotificationPreferences,
-      loginWithGoogle,
+      sendOTP,
+      verifyOTP,
       loginWithEmail,
       registerWithEmail,
       logout,

@@ -183,9 +183,5 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow write: if isAdmin() && isValidCoupon(request.resource.data);
     }
-
-    match /webview_sync/{syncId} {
-      allow read, write: if true;
-    }
   }
 }

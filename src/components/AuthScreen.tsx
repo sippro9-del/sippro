@@ -1,48 +1,149 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../AppContext';
 import { Logo } from './Common';
-import { Mail, Lock, User, ArrowRight } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { ArrowRight, Phone, ShieldCheck, RefreshCw } from 'lucide-react';
+import { motion } from 'motion/react';
+import { auth } from '../firebase';
+import { RecaptchaVerifier } from 'firebase/auth';
 
 export const AuthScreen: React.FC = () => {
-  const { setScreen, t, loginWithGoogle, loginWithEmail, registerWithEmail, authError, setAuthError } = useApp();
-  const [loading, setLoading] = useState(false);
-  const [isLogin, setIsLogin] = useState(true);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
+  const { setScreen, t, sendOTP, verifyOTP, authError, setAuthError } = useApp();
 
-  const handleGoogleSignIn = async () => {
-    setAuthError(null);
-    setLoading(true);
+  // Phone Auth States
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [countryCode, setCountryCode] = useState('+91');
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [timer, setTimer] = useState(0);
+  const [phoneLoading, setPhoneLoading] = useState(false);
+
+  // Cooldown timer for resend OTP
+  useEffect(() => {
+    let interval: any;
+    if (timer > 0) {
+      interval = setInterval(() => {
+        setTimer((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [timer]);
+
+  // Clean up reCAPTCHA verifier on unmount
+  useEffect(() => {
+    return () => {
+      try {
+        if ((window as any).recaptchaVerifier) {
+          ((window as any).recaptchaVerifier).clear();
+          (window as any).recaptchaVerifier = null;
+        }
+      } catch (e) {
+        console.warn("Cleanup of RecaptchaVerifier failed:", e);
+      }
+    };
+  }, []);
+
+  const getOrCreateRecaptcha = () => {
+    if ((window as any).recaptchaVerifier) {
+      return (window as any).recaptchaVerifier;
+    }
     try {
-      await loginWithGoogle();
-    } catch (err: any) {
-      console.error(err);
-    } finally {
-      setLoading(false);
+      const verifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+        size: 'invisible',
+        callback: () => {
+          console.log("reCAPTCHA solved");
+        },
+        'expired-callback': () => {
+          console.log("reCAPTCHA expired");
+        }
+      });
+      (window as any).recaptchaVerifier = verifier;
+      return verifier;
+    } catch (err) {
+      console.error("Error creating RecaptchaVerifier:", err);
+      return null;
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (phoneLoading) return;
     setAuthError(null);
-    setLoading(true);
+    setPhoneLoading(true);
+
+    const fullPhone = `${countryCode.trim()}${phoneNumber.trim()}`;
+    if (!phoneNumber || phoneNumber.trim().length < 10) {
+      setAuthError("Please enter a valid 10-digit mobile number.");
+      setPhoneLoading(false);
+      return;
+    }
+
     try {
-      if (isLogin) {
-        await loginWithEmail(email, password);
-      } else {
-        await registerWithEmail(email, password, name);
+      const verifier = getOrCreateRecaptcha();
+      if (!verifier) {
+        throw new Error("Failed to initialize security verification. Please try again.");
       }
+      
+      await sendOTP(fullPhone, verifier);
+      setOtpSent(true);
+      setTimer(30);
     } catch (err: any) {
-      console.error(err);
+      console.error("Error in handleSendOTP:", err);
+      try {
+        if ((window as any).recaptchaVerifier) {
+          ((window as any).recaptchaVerifier).clear();
+          (window as any).recaptchaVerifier = null;
+        }
+      } catch (e) {}
     } finally {
-      setLoading(false);
+      setPhoneLoading(false);
+    }
+  };
+
+  const handleResendOTP = async () => {
+    if (timer > 0 || phoneLoading) return;
+    setAuthError(null);
+    setPhoneLoading(true);
+    const fullPhone = `${countryCode.trim()}${phoneNumber.trim()}`;
+    try {
+      const verifier = getOrCreateRecaptcha();
+      if (!verifier) {
+        throw new Error("Failed to initialize security verification.");
+      }
+      await sendOTP(fullPhone, verifier);
+      setTimer(30);
+    } catch (err: any) {
+      console.error("Resend OTP error:", err);
+    } finally {
+      setPhoneLoading(false);
+    }
+  };
+
+  const handleVerifyOTP = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (phoneLoading) return;
+    setAuthError(null);
+    setPhoneLoading(true);
+
+    if (!otpCode || otpCode.trim().length !== 6) {
+      setAuthError("Please enter a valid 6-digit OTP code.");
+      setPhoneLoading(false);
+      return;
+    }
+
+    try {
+      await verifyOTP(otpCode.trim());
+    } catch (err: any) {
+      console.error("Error in handleVerifyOTP:", err);
+    } finally {
+      setPhoneLoading(false);
     }
   };
 
   return (
     <div className="min-h-screen bg-main-gradient flex flex-col md:flex-row">
+      {/* Invisible reCAPTCHA container */}
+      <div id="recaptcha-container" className="hidden"></div>
+
       {/* Banner Area */}
       <div className="h-48 md:h-screen md:w-1/2 bg-warm-gradient relative overflow-hidden flex items-center justify-center">
         <div className="absolute inset-0 opacity-10">
@@ -56,10 +157,10 @@ export const AuthScreen: React.FC = () => {
         <div className="max-w-md mx-auto w-full space-y-8">
           <div className="text-center md:text-left">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
-              {isLogin ? t('loginTitle') : t('createAccount')}
+              {otpSent ? t('verifyOtp') : t('loginTitle')}
             </h2>
             <p className="text-gray-500 mt-2">
-              {isLogin ? t('loginSubtitle') : t('joinUsSubtitle')}
+              {otpSent ? `${t('otpSentTo')} ${countryCode} ${phoneNumber}` : t('loginSubtitle')}
             </p>
           </div>
 
@@ -73,121 +174,117 @@ export const AuthScreen: React.FC = () => {
             </motion.div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <AnimatePresence mode="wait">
-              {!isLogin && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="space-y-2"
+          <div className="space-y-4">
+            {!otpSent ? (
+              /* Step 1: Request OTP */
+              <form onSubmit={handleSendOTP} className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-gray-700 ml-1">{t('phoneNumber')}</label>
+                  <div className="flex gap-2">
+                    <div className="w-24 relative">
+                      <input
+                        type="text"
+                        value={countryCode}
+                        onChange={(e) => setCountryCode(e.target.value)}
+                        placeholder="+91"
+                        className="w-full text-center py-4 bg-gray-50 border-2 border-transparent focus:border-[#FF8C00] focus:bg-white rounded-2xl transition-all outline-none font-bold text-gray-800"
+                      />
+                    </div>
+                    <div className="flex-1 relative">
+                      <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                      <input
+                        type="tel"
+                        pattern="[0-9]*"
+                        inputMode="numeric"
+                        required
+                        value={phoneNumber}
+                        onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ''))}
+                        placeholder="9876543210"
+                        className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-transparent focus:border-[#FF8C00] focus:bg-white rounded-2xl transition-all outline-none font-medium text-gray-800 font-bold"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={phoneLoading}
+                  className="w-full bg-[#FF8C00] text-white font-bold py-4 rounded-2xl shadow-lg shadow-orange-200 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2 animate-fade-in"
                 >
-                  <label className="text-sm font-semibold text-gray-700 ml-1">{t('fullName')}</label>
+                  {phoneLoading ? (
+                    <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      {t('continue')}
+                      <ArrowRight className="w-5 h-5" />
+                    </>
+                  )}
+                </button>
+              </form>
+            ) : (
+              /* Step 2: Verify OTP */
+              <form onSubmit={handleVerifyOTP} className="space-y-4">
+                <div className="text-center p-4 bg-orange-50 rounded-2xl border border-orange-100 animate-fade-in">
+                  <p className="text-xs text-gray-500">Wrong number entered?</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOtpSent(false);
+                      setOtpCode('');
+                      setAuthError(null);
+                    }}
+                    className="text-sm font-bold text-[#FF8C00] hover:underline mt-1"
+                  >
+                    {t('changeNumber')}
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-gray-700 ml-1">{t('verifyOtp')}</label>
                   <div className="relative">
-                    <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                     <input
                       type="text"
+                      pattern="[0-9]*"
+                      inputMode="numeric"
+                      maxLength={6}
                       required
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder="John Doe"
-                      className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-transparent focus:border-[#FF8C00] focus:bg-white rounded-2xl transition-all outline-none"
+                      value={otpCode}
+                      onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                      placeholder="123456"
+                      className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-transparent focus:border-[#FF8C00] focus:bg-white rounded-2xl transition-all outline-none text-center font-black tracking-[0.5em] text-lg text-gray-800"
                     />
                   </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+                </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-gray-700 ml-1">{t('email')}</label>
-              <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@example.com"
-                  className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-transparent focus:border-[#FF8C00] focus:bg-white rounded-2xl transition-all outline-none"
-                />
-              </div>
-            </div>
+                <button
+                  type="submit"
+                  disabled={phoneLoading}
+                  className="w-full bg-[#FF8C00] text-white font-bold py-4 rounded-2xl shadow-lg shadow-orange-200 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {phoneLoading ? (
+                    <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      {t('verifyAndContinue')}
+                      <ArrowRight className="w-5 h-5" />
+                    </>
+                  )}
+                </button>
 
-            <div className="space-y-2">
-              <div className="flex justify-between items-center px-1">
-                <label className="text-sm font-semibold text-gray-700">{t('password')}</label>
-                {isLogin && (
-                  <button type="button" className="text-xs font-bold text-[#FF8C00] hover:underline">
-                    {t('forgotPassword')}
+                <div className="text-center mt-2">
+                  <button
+                    type="button"
+                    disabled={timer > 0 || phoneLoading}
+                    onClick={handleResendOTP}
+                    className="text-sm font-bold text-gray-500 hover:text-gray-700 disabled:opacity-50 transition-colors inline-flex items-center gap-1.5"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${phoneLoading ? 'animate-spin' : ''}`} />
+                    {timer > 0 ? `Resend OTP in ${timer}s` : 'Resend OTP'}
                   </button>
-                )}
-              </div>
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-transparent focus:border-[#FF8C00] focus:bg-white rounded-2xl transition-all outline-none"
-                />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-[#FF8C00] text-white font-bold py-4 rounded-2xl shadow-lg shadow-orange-200 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {loading ? (
-                <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <>
-                  {isLogin ? t('login') : t('signup')}
-                  <ArrowRight className="w-5 h-5" />
-                </>
-              )}
-            </button>
-          </form>
-
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-100"></div>
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-white px-4 text-gray-400 font-medium">Or continue with</span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-4">
-            <button
-              onClick={handleGoogleSignIn}
-              disabled={loading}
-              className="flex items-center justify-center gap-3 bg-white border-2 border-gray-100 text-gray-700 font-bold py-4 rounded-2xl active:scale-[0.98] transition-all hover:bg-gray-50 disabled:opacity-50 shadow-sm"
-            >
-              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-6 h-6" referrerPolicy="no-referrer" />
-              Google
-            </button>
-          </div>
-
-          <div className="text-center">
-            <button
-              onClick={() => setIsLogin(!isLogin)}
-              className="text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors"
-            >
-              {isLogin ? (
-                <>
-                  {t('dontHaveAccount')}{' '}
-                  <span className="text-[#FF8C00] font-bold">{t('signup')}</span>
-                </>
-              ) : (
-                <>
-                  {t('alreadyHaveAccount')}{' '}
-                  <span className="text-[#FF8C00] font-bold">{t('login')}</span>
-                </>
-              )}
-            </button>
+                </div>
+              </form>
+            )}
           </div>
 
           <p className="text-center text-[10px] text-gray-400 leading-relaxed">
