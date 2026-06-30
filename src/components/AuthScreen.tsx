@@ -142,7 +142,7 @@ export const AuthScreen: React.FC = () => {
   return (
     <div className="min-h-screen bg-main-gradient flex flex-col md:flex-row">
       {/* Invisible reCAPTCHA container */}
-      <div id="recaptcha-container" className="hidden"></div>
+      <div id="recaptcha-container"></div>
 
       {/* Banner Area */}
       <div className="h-48 md:h-screen md:w-1/2 bg-warm-gradient relative overflow-hidden flex items-center justify-center">
