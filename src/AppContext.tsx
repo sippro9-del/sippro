@@ -6,7 +6,9 @@ import {
   createUserWithEmailAndPassword, 
   signOut,
   signInWithPhoneNumber,
-  RecaptchaVerifier
+  RecaptchaVerifier,
+  signInWithPopup,
+  GoogleAuthProvider
 } from 'firebase/auth';
 import { 
   doc, 
@@ -25,7 +27,7 @@ import {
   getDocFromServer,
   serverTimestamp
 } from 'firebase/firestore';
-import { auth, db } from './firebase';
+import { auth, db, googleProvider } from './firebase';
 import { AIMessage, CartItem, Product, Order, UserProfile, Screen, OrderStatus, ProductVariant, Coupon, NotificationPreferences, Banner, Category, Review } from './types';
 import { Language, translations } from './translations';
 import { getGeminiResponse } from './services/GeminiService';
@@ -84,6 +86,7 @@ interface AppContextType {
   // Notification functions
   updateNotificationPreferences: (prefs: NotificationPreferences) => Promise<void>;
   // Auth functions
+  loginWithGoogle: () => Promise<void>;
   sendOTP: (phoneNumber: string, recaptchaVerifier: any) => Promise<any>;
   verifyOTP: (otpCode: string) => Promise<void>;
   loginWithEmail: (email: string, pass: string) => Promise<void>;
@@ -751,6 +754,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const loginWithGoogle = async () => {
+    setLoading(true);
+    setAuthError(null);
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (error: any) {
+      console.error("Login error:", error);
+      handleAuthError(error);
+      setLoading(false);
+    }
+  };
+
   const sendOTP = async (phoneNumber: string, recaptchaVerifier: any) => {
     setLoading(true);
     setAuthError(null);
@@ -959,6 +974,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       applyCoupon,
       validateCoupon,
       updateNotificationPreferences,
+      loginWithGoogle,
       sendOTP,
       verifyOTP,
       loginWithEmail,
